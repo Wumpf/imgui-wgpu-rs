@@ -14,6 +14,7 @@ fn main() {
     env_logger::init();
 
     // Set up window and GPU
+    let instance = wgpu::Instance::new();
     let event_loop = EventLoop::new();
     let mut hidpi_factor = 1.0;
     let (window, mut size, surface) = {
@@ -27,12 +28,12 @@ fn main() {
         window.set_title(&format!("imgui-wgpu {}", version));
         let size = window.inner_size();
 
-        let surface = wgpu::Surface::create(&window);
+        let surface = unsafe { instance.create_surface(&window) };
 
         (window, size, surface)
     };
 
-    let adapter = block_on(wgpu::Adapter::request(
+    let adapter = block_on(instance.request_adapter(
         &wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::HighPerformance,
             compatible_surface: Some(&surface),
@@ -41,12 +42,16 @@ fn main() {
     ))
     .unwrap();
 
-    let (mut device, mut queue) = block_on(adapter.request_device(&wgpu::DeviceDescriptor {
-        extensions: wgpu::Extensions {
-            anisotropic_filtering: false,
+    let (mut device, mut queue) = block_on(adapter.request_device(
+        &wgpu::DeviceDescriptor {
+            extensions: wgpu::Extensions {
+                anisotropic_filtering: false,
+            },
+            limits: wgpu::Limits::default(),
         },
-        limits: wgpu::Limits::default(),
-    }));
+        None,
+    ))
+    .unwrap();
 
     // Set up swap chain
     let mut sc_desc = wgpu::SwapChainDescriptor {
@@ -218,7 +223,7 @@ fn main() {
                     .render(ui.render(), &mut device, &mut encoder, &frame.view)
                     .expect("Rendering failed");
 
-                queue.submit(&[encoder.finish()]);
+                queue.submit(Some(encoder.finish()));
             }
             _ => (),
         }
