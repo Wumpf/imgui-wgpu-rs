@@ -308,6 +308,7 @@ impl Renderer {
         draw_data: &DrawData,
         device: &Device,
         encoder: &'r mut CommandEncoder,
+        queue: &Queue,
         view: &TextureView,
     ) -> RendererResult<()> {
         let fb_width = draw_data.display_size[0] * draw_data.framebuffer_scale[0];
@@ -335,7 +336,7 @@ impl Renderer {
             [0.0, 0.0, 1.0, 0.0],
             [-1.0, 1.0, 0.0, 1.0],
         ];
-        self.update_uniform_buffer(device, encoder, &matrix);
+        self.update_uniform_buffer(queue, &matrix);
 
         // Start a new renderpass and prepare it properly.
         let mut rpass = encoder.begin_render_pass(&RenderPassDescriptor {
@@ -440,18 +441,9 @@ impl Renderer {
     }
 
     /// Updates the current uniform buffer containing the transform matrix.
-    fn update_uniform_buffer(
-        &mut self,
-        device: &Device,
-        encoder: &mut CommandEncoder,
-        matrix: &[[f32; 4]; 4],
-    ) {
+    fn update_uniform_buffer(&mut self, queue: &Queue, matrix: &[[f32; 4]; 4]) {
         let data = as_byte_slice(matrix);
-        // Create a new buffer.
-        let buffer = device.create_buffer_with_data(data, BufferUsage::COPY_SRC);
-
-        // Copy the new buffer to the real buffer.
-        encoder.copy_buffer_to_buffer(&buffer, 0, &self.uniform_buffer, 0, 64);
+        queue.write_buffer(&self.uniform_buffer, 0, data);
     }
 
     /// Upload the vertex buffer to the gPU.
