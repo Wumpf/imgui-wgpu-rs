@@ -171,7 +171,7 @@ fn main() {
             Event::RedrawEventsCleared => {
                 last_frame = imgui.io_mut().update_delta_time(last_frame);
 
-                let frame = match swap_chain.get_next_texture() {
+                let frame = match swap_chain.get_next_frame() {
                     Ok(frame) => frame,
                     Err(e) => {
                         eprintln!("dropped frame: {:?}", e);
@@ -203,7 +203,13 @@ fn main() {
                     platform.prepare_render(&ui, &window);
                 }
                 renderer
-                    .render(ui.render(), &mut device, &mut encoder, &queue, &frame.view)
+                    .render(
+                        ui.render(),
+                        &mut device,
+                        &mut encoder,
+                        &queue,
+                        &frame.output.view,
+                    )
                     .expect("Rendering failed");
 
                 queue.submit(Some(encoder.finish()));

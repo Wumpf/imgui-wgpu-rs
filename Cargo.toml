@@ -16,7 +16,7 @@ license = "MIT OR Apache-2.0"
 default = []
 
 [dependencies]
-wgpu = { git = "https://github.com/gfx-rs/wgpu-rs.git", rev="e371a2e" }
+wgpu = { git = "https://github.com/gfx-rs/wgpu-rs.git", rev="d7abf5c" }
 glsl-to-spirv = { version = "0.1", optional = true }
 log = "0.4"
 imgui = "0.4"
@@ -35,6 +35,3 @@ features = ["winit-20"]
 
 [package.metadata.docs.rs]
 all-features = true
-
-# [patch.crates-io]
-# wgpu = { version = "0.4", git = "https://github.com/gfx-rs/wgpu-rs.git", rev = "7b15e24" }
