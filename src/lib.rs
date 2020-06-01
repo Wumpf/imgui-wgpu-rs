@@ -544,37 +544,24 @@ impl Renderer {
             usage: TextureUsage::SAMPLED | TextureUsage::COPY_DST,
         });
 
-        // Upload the actual data to a wgpu buffer.
-        let bytes = data.len();
-        let buffer = device.create_buffer_with_data(data, BufferUsage::COPY_SRC);
-
-        // Make sure we have an active encoder.
-        let mut encoder = device.create_command_encoder(&CommandEncoderDescriptor { label: None });
-
-        // Schedule a copy from the buffer to the texture.
-        encoder.copy_buffer_to_texture(
-            BufferCopyView {
-                buffer: &buffer,
-                layout: wgpu::TextureDataLayout {
-                    offset: 0,
-                    bytes_per_row: bytes as u32 / height,
-                    rows_per_image: height,
-                },
-            },
+        queue.write_texture(
             TextureCopyView {
                 texture: &texture,
                 mip_level: 0,
                 origin: Origin3d { x: 0, y: 0, z: 0 },
             },
-            Extent3d {
+            data,
+            wgpu::TextureDataLayout {
+                offset: 0,
+                bytes_per_row: data.len() as u32 / height,
+                rows_per_image: height,
+            },
+            wgpu::Extent3d {
                 width,
                 height,
                 depth: 1,
             },
         );
-
-        // Resolve the actual copy process.
-        queue.submit(Some(encoder.finish()));
 
         let texture = Texture::new(texture, &self.texture_layout, device);
         self.textures.insert(texture)
