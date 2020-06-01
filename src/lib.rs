@@ -465,38 +465,34 @@ impl Renderer {
         );
 
         for cmd in draw_list.commands() {
-            match cmd {
-                Elements { count, cmd_params } => {
-                    let clip_rect = [
-                        (cmd_params.clip_rect[0] - clip_off[0]) * clip_scale[0],
-                        (cmd_params.clip_rect[1] - clip_off[1]) * clip_scale[1],
-                        (cmd_params.clip_rect[2] - clip_off[0]) * clip_scale[0],
-                        (cmd_params.clip_rect[3] - clip_off[1]) * clip_scale[1],
-                    ];
+            if let Elements { count, cmd_params } = cmd {
+                let clip_rect = [
+                    (cmd_params.clip_rect[0] - clip_off[0]) * clip_scale[0],
+                    (cmd_params.clip_rect[1] - clip_off[1]) * clip_scale[1],
+                    (cmd_params.clip_rect[2] - clip_off[0]) * clip_scale[0],
+                    (cmd_params.clip_rect[3] - clip_off[1]) * clip_scale[1],
+                ];
 
-                    // Set the current texture bind group on the renderpass.
-                    let texture_id = cmd_params.texture_id.into();
-                    let tex = self
-                        .textures
-                        .get(texture_id)
-                        .ok_or_else(|| RendererError::BadTexture(texture_id))?;
-                    rpass.set_bind_group(1, &tex.bind_group, &[]);
+                // Set the current texture bind group on the renderpass.
+                let tex = self
+                    .textures
+                    .get(cmd_params.texture_id)
+                    .ok_or_else(|| RendererError::BadTexture(cmd_params.texture_id))?;
+                rpass.set_bind_group(1, &tex.bind_group, &[]);
 
-                    // Set scissors on the renderpass.
-                    let scissors = (
-                        clip_rect[0].max(0.0).floor() as u32,
-                        clip_rect[1].max(0.0).floor() as u32,
-                        (clip_rect[2] - clip_rect[0]).abs().ceil() as u32,
-                        (clip_rect[3] - clip_rect[1]).abs().ceil() as u32,
-                    );
-                    rpass.set_scissor_rect(scissors.0, scissors.1, scissors.2, scissors.3);
+                // Set scissors on the renderpass.
+                let scissors = (
+                    clip_rect[0].max(0.0).floor() as u32,
+                    clip_rect[1].max(0.0).floor() as u32,
+                    (clip_rect[2] - clip_rect[0]).abs().ceil() as u32,
+                    (clip_rect[3] - clip_rect[1]).abs().ceil() as u32,
+                );
+                rpass.set_scissor_rect(scissors.0, scissors.1, scissors.2, scissors.3);
 
-                    // Draw the current batch of vertices with the renderpass.
-                    let end = start + count as u32;
-                    rpass.draw_indexed(start..end, 0, 0..1);
-                    start = end;
-                }
-                _ => {}
+                // Draw the current batch of vertices with the renderpass.
+                let end = start + count as u32;
+                rpass.draw_indexed(start..end, 0, 0..1);
+                start = end;
             }
         }
         Ok(())
