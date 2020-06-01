@@ -83,7 +83,6 @@ impl Texture {
     }
 }
 
-#[allow(dead_code)]
 pub struct Renderer {
     pipeline: RenderPipeline,
     uniform_buffer: Buffer,
@@ -91,8 +90,11 @@ pub struct Renderer {
     textures: Textures<Texture>,
     texture_layout: BindGroupLayout,
     clear_color: Option<Color>,
-    index_buffers: Vec<Buffer>,
-    vertex_buffers: Vec<Buffer>,
+
+    vertex_buffer_capacity: u64,
+    index_buffer_capacity: u64,
+    index_buffer: Buffer,
+    vertex_buffer: Buffer,
 }
 
 impl Renderer {
@@ -285,6 +287,9 @@ impl Renderer {
             alpha_to_coverage_enabled: false,
         });
 
+        const INITIAL_VERTEX_BUFFER_CAPACITY: u64 = 2048;
+        const INITIAL_INDEX_BUFFER_CAPACITY: u64 = INITIAL_VERTEX_BUFFER_CAPACITY * 4;
+
         let mut renderer = Renderer {
             pipeline,
             uniform_buffer,
@@ -292,14 +297,33 @@ impl Renderer {
             textures: Textures::new(),
             texture_layout,
             clear_color,
-            vertex_buffers: vec![],
-            index_buffers: vec![],
+
+            vertex_buffer_capacity: INITIAL_VERTEX_BUFFER_CAPACITY,
+            index_buffer_capacity: INITIAL_INDEX_BUFFER_CAPACITY,
+            vertex_buffer: Self::create_vertex_buffer(device, INITIAL_VERTEX_BUFFER_CAPACITY),
+            index_buffer: Self::create_index_buffer(device, INITIAL_INDEX_BUFFER_CAPACITY),
         };
 
         // Immediately load the fon texture to the GPU.
         renderer.reload_font_texture(imgui, device, queue);
 
         renderer
+    }
+
+    fn create_vertex_buffer(device: &Device, num_vertices: u64) -> Buffer {
+        device.create_buffer(&BufferDescriptor {
+            label: Some("ImGui Vertex Buffer"),
+            size: num_vertices * size_of::<DrawVert>() as u64,
+            usage: BufferUsage::VERTEX | BufferUsage::COPY_DST,
+        })
+    }
+
+    fn create_index_buffer(device: &Device, num_indices: u64) -> Buffer {
+        device.create_buffer(&BufferDescriptor {
+            label: Some("ImGui Index Buffer"),
+            size: num_indices * size_of::<DrawIdx>() as u64,
+            usage: BufferUsage::INDEX | BufferUsage::COPY_DST,
+        })
     }
 
     /// Render the current imgui frame.
@@ -360,25 +384,55 @@ impl Renderer {
         rpass.set_pipeline(&self.pipeline);
         rpass.set_bind_group(0, &self.uniform_bind_group, &[]);
 
-        self.vertex_buffers.clear();
-        self.index_buffers.clear();
-
-        for draw_list in draw_data.draw_lists() {
-            self.vertex_buffers
-                .push(self.upload_vertex_buffer(device, draw_list.vtx_buffer()));
-            self.index_buffers
-                .push(self.upload_index_buffer(device, draw_list.idx_buffer()));
+        // Resize vertex & index buffer if necessary.
+        {
+            let required_vertex_buffer_size = draw_data
+                .draw_lists()
+                .map(|draw_list| draw_list.vtx_buffer().len())
+                .sum::<usize>() as u64;
+            if required_vertex_buffer_size > self.vertex_buffer_capacity {
+                self.vertex_buffer_capacity = required_vertex_buffer_size;
+                self.vertex_buffer =
+                    Self::create_vertex_buffer(device, self.vertex_buffer_capacity);
+            }
+        }
+        {
+            let required_index_buffer_size = draw_data
+                .draw_lists()
+                .map(|draw_list| draw_list.idx_buffer().len())
+                .sum::<usize>() as u64;
+            if required_index_buffer_size > self.index_buffer_capacity {
+                self.index_buffer_capacity = required_index_buffer_size;
+                self.index_buffer = Self::create_index_buffer(device, self.index_buffer_capacity);
+            }
         }
 
-        // Execute all the imgui render work.
-        for (draw_list_buffers_index, draw_list) in draw_data.draw_lists().enumerate() {
+        // Transfer data and execute all the imgui render work.
+        let mut vertex_offset = 0;
+        let mut index_offset = 0;
+        for draw_list in draw_data.draw_lists() {
+            queue.write_buffer(
+                &self.vertex_buffer,
+                vertex_offset * size_of::<DrawVert>() as BufferAddress,
+                as_byte_slice(draw_list.vtx_buffer()),
+            );
+            queue.write_buffer(
+                &self.index_buffer,
+                index_offset * size_of::<DrawIdx>() as BufferAddress,
+                as_byte_slice(draw_list.idx_buffer()),
+            );
+
             self.render_draw_list(
                 &mut rpass,
                 &draw_list,
                 draw_data.display_pos,
                 draw_data.framebuffer_scale,
-                draw_list_buffers_index,
+                vertex_offset,
+                index_offset,
             )?;
+
+            vertex_offset += draw_list.vtx_buffer().len() as u64;
+            index_offset += draw_list.idx_buffer().len() as u64;
         }
 
         Ok(())
@@ -391,16 +445,24 @@ impl Renderer {
         draw_list: &DrawList,
         clip_off: [f32; 2],
         clip_scale: [f32; 2],
-        draw_list_buffers_index: usize,
+        vertex_offset: u64,
+        index_offset: u64,
     ) -> RendererResult<()> {
         let mut start = 0;
 
-        let index_buffer = &self.index_buffers[draw_list_buffers_index];
-        let vertex_buffer = &self.vertex_buffers[draw_list_buffers_index];
-
-        // Make sure the current buffers are attached to the render pass.
-        rpass.set_index_buffer(index_buffer.slice(..));
-        rpass.set_vertex_buffer(0, vertex_buffer.slice(..));
+        rpass.set_index_buffer(self.index_buffer.slice(
+            (index_offset * size_of::<DrawIdx>() as u64)
+                ..((index_offset + draw_list.idx_buffer().len() as u64)
+                    * size_of::<DrawIdx>() as u64),
+        ));
+        rpass.set_vertex_buffer(
+            0,
+            self.vertex_buffer.slice(
+                (vertex_offset * size_of::<DrawVert>() as u64)
+                    ..((vertex_offset + draw_list.vtx_buffer().len() as u64)
+                        * size_of::<DrawVert>() as u64),
+            ),
+        );
 
         for cmd in draw_list.commands() {
             match cmd {
@@ -444,18 +506,6 @@ impl Renderer {
     fn update_uniform_buffer(&mut self, queue: &Queue, matrix: &[[f32; 4]; 4]) {
         let data = as_byte_slice(matrix);
         queue.write_buffer(&self.uniform_buffer, 0, data);
-    }
-
-    /// Upload the vertex buffer to the gPU.
-    fn upload_vertex_buffer(&self, device: &Device, vertices: &[DrawVert]) -> Buffer {
-        let data = as_byte_slice(&vertices);
-        device.create_buffer_with_data(data, BufferUsage::VERTEX)
-    }
-
-    /// Upload the index buffer to the GPU.
-    fn upload_index_buffer(&self, device: &Device, indices: &[DrawIdx]) -> Buffer {
-        let data = as_byte_slice(&indices);
-        device.create_buffer_with_data(data, BufferUsage::INDEX)
     }
 
     /// Updates the texture on the GPU corresponding to the current imgui font atlas.
