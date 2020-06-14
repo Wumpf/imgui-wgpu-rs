@@ -52,15 +52,10 @@ impl Texture {
         // Create the texture sampler.
         let sampler = device.create_sampler(&SamplerDescriptor {
             label: Some("ImGui Sampler"),
-            address_mode_u: AddressMode::ClampToEdge,
-            address_mode_v: AddressMode::ClampToEdge,
-            address_mode_w: AddressMode::ClampToEdge,
             mag_filter: FilterMode::Linear,
             min_filter: FilterMode::Linear,
             mipmap_filter: FilterMode::Linear,
-            lod_min_clamp: -100.0,
-            lod_max_clamp: 100.0,
-            compare: CompareFunction::Always,
+            ..Default::default()
         });
 
         // Create the texture bind group from the layout.
@@ -176,6 +171,7 @@ impl Renderer {
             label: None,
             size,
             usage: BufferUsage::UNIFORM | BufferUsage::COPY_DST,
+            mapped_at_creation: false,
         });
 
         // Create the uniform matrix buffer bind group layout.
@@ -185,6 +181,7 @@ impl Renderer {
                 binding: 0,
                 visibility: wgpu::ShaderStage::VERTEX,
                 ty: BindingType::UniformBuffer { dynamic: false },
+                ..Default::default()
             }],
         });
 
@@ -210,11 +207,13 @@ impl Renderer {
                         component_type: TextureComponentType::Float,
                         dimension: TextureViewDimension::D2,
                     },
+                    ..Default::default()
                 },
                 BindGroupLayoutEntry {
                     binding: 1,
                     visibility: wgpu::ShaderStage::FRAGMENT,
                     ty: BindingType::Sampler { comparison: false },
+                    ..Default::default()
                 },
             ],
         });
@@ -315,6 +314,7 @@ impl Renderer {
             label: Some("ImGui Vertex Buffer"),
             size: num_vertices * size_of::<DrawVert>() as u64,
             usage: BufferUsage::VERTEX | BufferUsage::COPY_DST,
+            mapped_at_creation: false,
         })
     }
 
@@ -323,6 +323,7 @@ impl Renderer {
             label: Some("ImGui Index Buffer"),
             size: num_indices * size_of::<DrawIdx>() as u64,
             usage: BufferUsage::INDEX | BufferUsage::COPY_DST,
+            mapped_at_creation: false,
         })
     }
 
@@ -399,7 +400,7 @@ impl Renderer {
         {
             let required_index_buffer_size = draw_data
                 .draw_lists()
-                .map(|draw_list| draw_list.idx_buffer().len())
+                .map(|draw_list| (draw_list.idx_buffer().len() + 3) / 4 * 4)
                 .sum::<usize>() as u64;
             if required_index_buffer_size > self.index_buffer_capacity {
                 self.index_buffer_capacity = required_index_buffer_size;
@@ -416,10 +417,18 @@ impl Renderer {
                 vertex_offset * size_of::<DrawVert>() as BufferAddress,
                 as_byte_slice(draw_list.vtx_buffer()),
             );
+
+            // Hack to ensure that index buffer data length is a multiple of four (webgpu requirement).
+            // We "know" this won't crash since arrays are 4 byte aligned
+            let index_data = unsafe {
+                let index_data = as_byte_slice(draw_list.idx_buffer());
+                std::slice::from_raw_parts(index_data.as_ptr(), (index_data.len() + 3) / 4 * 4)
+            };
+
             queue.write_buffer(
                 &self.index_buffer,
                 index_offset * size_of::<DrawIdx>() as BufferAddress,
-                as_byte_slice(draw_list.idx_buffer()),
+                index_data,
             );
 
             self.render_draw_list(
@@ -432,7 +441,7 @@ impl Renderer {
             )?;
 
             vertex_offset += draw_list.vtx_buffer().len() as u64;
-            index_offset += draw_list.idx_buffer().len() as u64;
+            index_offset += (draw_list.idx_buffer().len() as u64 + 3) / 4 * 4;
         }
 
         Ok(())

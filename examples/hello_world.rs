@@ -38,16 +38,16 @@ fn main() {
             power_preference: wgpu::PowerPreference::HighPerformance,
             compatible_surface: Some(&surface),
         },
+        wgpu::UnsafeExtensions::disallow(),
         wgpu::BackendBit::PRIMARY,
     ))
     .unwrap();
 
     let (mut device, mut queue) = block_on(adapter.request_device(
         &wgpu::DeviceDescriptor {
-            extensions: wgpu::Extensions {
-                anisotropic_filtering: false,
-            },
+            extensions: wgpu::Extensions::empty(),
             limits: wgpu::Limits::default(),
+            shader_validation: true,
         },
         None,
     ))
