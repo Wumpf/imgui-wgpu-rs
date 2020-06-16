@@ -1,7 +1,7 @@
 [package]
 name = "imgui-wgpu"
-version = "0.6.0"
-authors = ["Noah Hüsser <yatekii@yatekii.ch>", "Steven Wittens <steven@acko.net>"]
+version = "0.6.1"
+authors = ["Noah Hüsser <yatekii@yatekii.ch>", "Steven Wittens <steven@acko.net>, Andreas Reich <reichandreas@gmx.de>"]
 edition = "2018"
 description = "A wgpu render backend for imgui-rs."
 documentation = "https://docs.rs/imgui-wgpu/"
@@ -16,7 +16,7 @@ license = "MIT OR Apache-2.0"
 default = []
 
 [dependencies]
-wgpu = { git = "https://github.com/gfx-rs/wgpu-rs.git", rev="554327a" }
+wgpu = { git = "https://github.com/gfx-rs/wgpu-rs.git", rev="0e2b612c5f33862b328b179e09ae0598cdb21fae" }
 glsl-to-spirv = { version = "0.1", optional = true }
 log = "0.4"
 imgui = "0.4"
