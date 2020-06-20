@@ -15,7 +15,7 @@ fn main() {
     env_logger::init();
 
     // Set up window and GPU
-    let instance = wgpu::Instance::new();
+    let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
     let event_loop = EventLoop::new();
     let mut hidpi_factor = 1.0;
     let (window, mut size, surface) = {
@@ -40,7 +40,6 @@ fn main() {
             compatible_surface: Some(&surface),
         },
         wgpu::UnsafeExtensions::disallow(),
-        wgpu::BackendBit::PRIMARY,
     ))
     .unwrap();
 

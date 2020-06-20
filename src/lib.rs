@@ -162,14 +162,14 @@ impl Renderer {
         fs_raw: Vec<u32>,
     ) -> Renderer {
         // Load shaders.
-        let vs_module = device.create_shader_module(&vs_raw);
-        let fs_module = device.create_shader_module(&fs_raw);
+        let vs_module = device.create_shader_module(wgpu::ShaderModuleSource::SpirV(&vs_raw));
+        let fs_module = device.create_shader_module(wgpu::ShaderModuleSource::SpirV(&fs_raw));
 
         // Create the uniform matrix buffer.
-        let size = 64;
+        let uniform_buffer_size = 64;
         let uniform_buffer = device.create_buffer(&BufferDescriptor {
             label: None,
-            size,
+            size: uniform_buffer_size,
             usage: BufferUsage::UNIFORM | BufferUsage::COPY_DST,
             mapped_at_creation: false,
         });
@@ -177,12 +177,14 @@ impl Renderer {
         // Create the uniform matrix buffer bind group layout.
         let uniform_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             label: None,
-            bindings: &[BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStage::VERTEX,
-                ty: BindingType::UniformBuffer { dynamic: false },
-                ..Default::default()
-            }],
+            bindings: &[BindGroupLayoutEntry::new(
+                0,
+                wgpu::ShaderStage::VERTEX,
+                BindingType::UniformBuffer {
+                    dynamic: false,
+                    min_binding_size: wgpu::NonZeroBufferAddress::new(uniform_buffer_size),
+                },
+            )],
         });
 
         // Create the uniform matrix buffer bind group.
@@ -199,22 +201,20 @@ impl Renderer {
         let texture_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             label: None,
             bindings: &[
-                BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStage::FRAGMENT,
-                    ty: BindingType::SampledTexture {
+                BindGroupLayoutEntry::new(
+                    0,
+                    wgpu::ShaderStage::FRAGMENT,
+                    BindingType::SampledTexture {
                         multisampled: false,
                         component_type: TextureComponentType::Float,
                         dimension: TextureViewDimension::D2,
                     },
-                    ..Default::default()
-                },
-                BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStage::FRAGMENT,
-                    ty: BindingType::Sampler { comparison: false },
-                    ..Default::default()
-                },
+                ),
+                BindGroupLayoutEntry::new(
+                    1,
+                    wgpu::ShaderStage::FRAGMENT,
+                    BindingType::Sampler { comparison: false },
+                ),
             ],
         });
 
@@ -382,6 +382,7 @@ impl Renderer {
             }],
             depth_stencil_attachment: None,
         });
+        rpass.push_debug_group("imgui");
         rpass.set_pipeline(&self.pipeline);
         rpass.set_bind_group(0, &self.uniform_bind_group, &[]);
 
@@ -443,6 +444,7 @@ impl Renderer {
             vertex_offset += draw_list.vtx_buffer().len() as u64;
             index_offset += (draw_list.idx_buffer().len() as u64 + 3) / 4 * 4;
         }
+        rpass.pop_debug_group();
 
         Ok(())
     }
@@ -458,6 +460,7 @@ impl Renderer {
         index_offset: u64,
     ) -> RendererResult<()> {
         let mut start = 0;
+        rpass.push_debug_group("imgui - draw list");
 
         rpass.set_index_buffer(self.index_buffer.slice(
             (index_offset * size_of::<DrawIdx>() as u64)
@@ -504,6 +507,8 @@ impl Renderer {
                 start = end;
             }
         }
+
+        rpass.pop_debug_group();
         Ok(())
     }
 
