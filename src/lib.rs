@@ -182,7 +182,7 @@ impl Renderer {
                 wgpu::ShaderStage::VERTEX,
                 BindingType::UniformBuffer {
                     dynamic: false,
-                    min_binding_size: wgpu::NonZeroBufferAddress::new(uniform_buffer_size),
+                    min_binding_size: wgpu::BufferSize::new(uniform_buffer_size),
                 },
             )],
         });
@@ -368,21 +368,17 @@ impl Renderer {
             color_attachments: &[RenderPassColorAttachmentDescriptor {
                 attachment: &view,
                 resolve_target: None,
-                load_op: match self.clear_color {
-                    Some(_) => LoadOp::Clear,
-                    _ => LoadOp::Load,
+                ops: Operations {
+                    load: match self.clear_color {
+                        Some(color) => LoadOp::Clear(color),
+                        _ => LoadOp::Load,
+                    },
+                    store: true,
                 },
-                store_op: StoreOp::Store,
-                clear_color: self.clear_color.unwrap_or(Color {
-                    r: 0.0,
-                    g: 0.0,
-                    b: 0.0,
-                    a: 1.0,
-                }),
             }],
             depth_stencil_attachment: None,
         });
-        rpass.push_debug_group("imgui");
+        rpass.push_debug_group("ImGui");
         rpass.set_pipeline(&self.pipeline);
         rpass.set_bind_group(0, &self.uniform_bind_group, &[]);
 
@@ -460,7 +456,7 @@ impl Renderer {
         index_offset: u64,
     ) -> RendererResult<()> {
         let mut start = 0;
-        rpass.push_debug_group("imgui - draw list");
+        rpass.push_debug_group("draw list");
 
         rpass.set_index_buffer(self.index_buffer.slice(
             (index_offset * size_of::<DrawIdx>() as u64)

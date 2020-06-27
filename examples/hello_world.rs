@@ -38,13 +38,13 @@ fn main() {
             power_preference: wgpu::PowerPreference::HighPerformance,
             compatible_surface: Some(&surface),
         },
-        wgpu::UnsafeExtensions::disallow(),
+        wgpu::UnsafeFeatures::disallow(),
     ))
     .unwrap();
 
     let (mut device, mut queue) = block_on(adapter.request_device(
         &wgpu::DeviceDescriptor {
-            extensions: wgpu::Extensions::empty(),
+            features: wgpu::Features::empty(),
             limits: wgpu::Limits::default(),
             shader_validation: true,
         },
