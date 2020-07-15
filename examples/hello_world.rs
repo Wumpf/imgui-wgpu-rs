@@ -33,13 +33,10 @@ fn main() {
         (window, size, surface)
     };
 
-    let adapter = block_on(instance.request_adapter(
-        &wgpu::RequestAdapterOptions {
-            power_preference: wgpu::PowerPreference::HighPerformance,
-            compatible_surface: Some(&surface),
-        },
-        wgpu::UnsafeFeatures::disallow(),
-    ))
+    let adapter = block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
+        power_preference: wgpu::PowerPreference::HighPerformance,
+        compatible_surface: Some(&surface),
+    }))
     .unwrap();
 
     let (mut device, mut queue) = block_on(adapter.request_device(

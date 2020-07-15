@@ -62,12 +62,12 @@ impl Texture {
         let bind_group = device.create_bind_group(&BindGroupDescriptor {
             label: None,
             layout,
-            bindings: &[
-                Binding {
+            entries: &[
+                BindGroupEntry {
                     binding: 0,
                     resource: BindingResource::TextureView(&view),
                 },
-                Binding {
+                BindGroupEntry {
                     binding: 1,
                     resource: BindingResource::Sampler(&sampler),
                 },
@@ -177,7 +177,7 @@ impl Renderer {
         // Create the uniform matrix buffer bind group layout.
         let uniform_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             label: None,
-            bindings: &[BindGroupLayoutEntry::new(
+            entries: &[BindGroupLayoutEntry::new(
                 0,
                 wgpu::ShaderStage::VERTEX,
                 BindingType::UniformBuffer {
@@ -191,7 +191,7 @@ impl Renderer {
         let uniform_bind_group = device.create_bind_group(&BindGroupDescriptor {
             label: None,
             layout: &uniform_layout,
-            bindings: &[Binding {
+            entries: &[BindGroupEntry {
                 binding: 0,
                 resource: wgpu::BindingResource::Buffer(uniform_buffer.slice(..)),
             }],
@@ -200,7 +200,7 @@ impl Renderer {
         // Create the texture layout for further usage.
         let texture_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             label: None,
-            bindings: &[
+            entries: &[
                 BindGroupLayoutEntry::new(
                     0,
                     wgpu::ShaderStage::FRAGMENT,
@@ -221,6 +221,7 @@ impl Renderer {
         // Create the render pipeline layout.
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             bind_group_layouts: &[&uniform_layout, &texture_layout],
+            push_constant_ranges: &[],
         });
 
         // Create the render pipeline.

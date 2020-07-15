@@ -1,37 +1,37 @@
 [package]
-name = "imgui-wgpu"
-version = "0.6.1"
 authors = ["Noah Hüsser <yatekii@yatekii.ch>", "Steven Wittens <steven@acko.net>, Andreas Reich <reichandreas@gmx.de>"]
-edition = "2018"
+categories = ["gui", "graphics", "rendering", "rendering::graphics-api"]
 description = "A wgpu render backend for imgui-rs."
 documentation = "https://docs.rs/imgui-wgpu/"
+edition = "2018"
 homepage = "https://github.com/Yatekii/imgui-wgpu-rs"
-repository = "https://github.com/Yatekii/imgui-wgpu-rs"
-readme = "README.md"
-categories = ["gui", "graphics", "rendering", "rendering::graphics-api"]
 keywords = ["gui", "graphics", "wgpu", "imgui"]
 license = "MIT OR Apache-2.0"
+name = "imgui-wgpu"
+readme = "README.md"
+repository = "https://github.com/Yatekii/imgui-wgpu-rs"
+version = "0.6.1"
 
 [features]
 default = []
 
 [dependencies]
-wgpu = { git = "https://github.com/gfx-rs/wgpu-rs.git", rev="18be98d4bb625c5f0e3fecdf5a06cd790bcb8025" }
-glsl-to-spirv = { version = "0.1", optional = true }
-log = "0.4"
+glsl-to-spirv = {version = "0.1", optional = true}
 imgui = "0.4"
+log = "0.4"
+wgpu = {git = "https://github.com/gfx-rs/wgpu-rs.git", rev = "32de700ef908029cc5f8ac3b0befd7439f5bd7bd"}
 
 [dev-dependencies]
-winit = "0.21"
-raw-window-handle = "0.3"
 env_logger = "0.5"
-image = "0.22"
 futures = "0.3"
+image = "0.22"
+raw-window-handle = "0.3"
+winit = "0.21"
 
 [dev-dependencies.imgui-winit-support]
-version = "0.4"
 default-features = false
 features = ["winit-20"]
+version = "0.4"
 
 [package.metadata.docs.rs]
 all-features = true
