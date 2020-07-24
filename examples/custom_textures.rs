@@ -167,7 +167,7 @@ fn main() {
             Event::RedrawEventsCleared => {
                 last_frame = imgui.io_mut().update_delta_time(last_frame);
 
-                let frame = match swap_chain.get_next_frame() {
+                let frame = match swap_chain.get_current_frame() {
                     Ok(frame) => frame,
                     Err(e) => {
                         eprintln!("dropped frame: {:?}", e);
