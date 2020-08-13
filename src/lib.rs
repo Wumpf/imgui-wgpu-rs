@@ -48,11 +48,11 @@ impl Texture {
     /// Creates a new imgui texture from a wgpu texture.
     pub fn new(texture: wgpu::Texture, layout: &BindGroupLayout, device: &Device) -> Self {
         // Extract the texture view.
-        let view = texture.create_default_view();
+        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 
         // Create the texture sampler.
         let sampler = device.create_sampler(&SamplerDescriptor {
-            label: Some(Borrowed("ImGui Sampler")),
+            label: Some("ImGui Sampler"),
             mag_filter: FilterMode::Linear,
             min_filter: FilterMode::Linear,
             mipmap_filter: FilterMode::Linear,
@@ -63,7 +63,7 @@ impl Texture {
         let bind_group = device.create_bind_group(&BindGroupDescriptor {
             label: None,
             layout,
-            entries: Borrowed(&[
+            entries: &[
                 BindGroupEntry {
                     binding: 0,
                     resource: BindingResource::TextureView(&view),
@@ -72,7 +72,7 @@ impl Texture {
                     binding: 1,
                     resource: BindingResource::Sampler(&sampler),
                 },
-            ]),
+            ],
         });
 
         Texture { bind_group }
@@ -180,63 +180,67 @@ impl Renderer {
         // Create the uniform matrix buffer bind group layout.
         let uniform_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             label: None,
-            entries: Borrowed(&[BindGroupLayoutEntry::new(
-                0,
-                wgpu::ShaderStage::VERTEX,
-                BindingType::UniformBuffer {
+            entries: &[BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStage::VERTEX,
+                ty: BindingType::UniformBuffer {
                     dynamic: false,
                     min_binding_size: wgpu::BufferSize::new(uniform_buffer_size),
                 },
-            )]),
+                count: None,
+            }],
         });
 
         // Create the uniform matrix buffer bind group.
         let uniform_bind_group = device.create_bind_group(&BindGroupDescriptor {
             label: None,
             layout: &uniform_layout,
-            entries: Borrowed(&[BindGroupEntry {
+            entries: &[BindGroupEntry {
                 binding: 0,
                 resource: wgpu::BindingResource::Buffer(uniform_buffer.slice(..)),
-            }]),
+            }],
         });
 
         // Create the texture layout for further usage.
         let texture_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             label: None,
-            entries: Borrowed(&[
-                BindGroupLayoutEntry::new(
-                    0,
-                    wgpu::ShaderStage::FRAGMENT,
-                    BindingType::SampledTexture {
+            entries: &[
+                BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStage::FRAGMENT,
+                    ty: BindingType::SampledTexture {
                         multisampled: false,
                         component_type: TextureComponentType::Float,
                         dimension: TextureViewDimension::D2,
                     },
-                ),
-                BindGroupLayoutEntry::new(
-                    1,
-                    wgpu::ShaderStage::FRAGMENT,
-                    BindingType::Sampler { comparison: false },
-                ),
-            ]),
+                    count: None,
+                },
+                BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStage::FRAGMENT,
+                    ty: BindingType::Sampler { comparison: false },
+                    count: None,
+                },
+            ],
         });
 
         // Create the render pipeline layout.
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
-            bind_group_layouts: Borrowed(&[&uniform_layout, &texture_layout]),
-            push_constant_ranges: Borrowed(&[]),
+            label: Some("ImGui Pipeline Layout"),
+            bind_group_layouts: &[&uniform_layout, &texture_layout],
+            push_constant_ranges: &[],
         });
 
         // Create the render pipeline.
         let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
-            layout: &pipeline_layout,
+            layout: Some(&pipeline_layout),
             vertex_stage: ProgrammableStageDescriptor {
                 module: &vs_module,
-                entry_point: Borrowed("main"),
+                entry_point: "main",
             },
             fragment_stage: Some(ProgrammableStageDescriptor {
                 module: &fs_module,
-                entry_point: Borrowed("main"),
+                entry_point: "main",
             }),
             rasterization_state: Some(RasterizationStateDescriptor {
                 front_face: FrontFace::Cw,
@@ -247,7 +251,7 @@ impl Renderer {
                 depth_bias_clamp: 0.0,
             }),
             primitive_topology: PrimitiveTopology::TriangleList,
-            color_states: Borrowed(&[ColorStateDescriptor {
+            color_states: &[ColorStateDescriptor {
                 format,
                 color_blend: BlendDescriptor {
                     src_factor: BlendFactor::SrcAlpha,
@@ -260,14 +264,14 @@ impl Renderer {
                     operation: BlendOperation::Add,
                 },
                 write_mask: ColorWrite::ALL,
-            }]),
+            }],
             depth_stencil_state: None,
             vertex_state: VertexStateDescriptor {
                 index_format: IndexFormat::Uint16,
-                vertex_buffers: Borrowed(&[VertexBufferDescriptor {
+                vertex_buffers: &[VertexBufferDescriptor {
                     stride: size_of::<DrawVert>() as BufferAddress,
                     step_mode: InputStepMode::Vertex,
-                    attributes: Borrowed(&[
+                    attributes: &[
                         VertexAttributeDescriptor {
                             format: VertexFormat::Float2,
                             shader_location: 0,
@@ -283,8 +287,8 @@ impl Renderer {
                             shader_location: 2,
                             offset: 16,
                         },
-                    ]),
-                }]),
+                    ],
+                }],
             },
             sample_count: 1,
             sample_mask: !0,
@@ -316,7 +320,7 @@ impl Renderer {
 
     fn create_vertex_buffer(device: &Device, num_vertices: u64) -> Buffer {
         device.create_buffer(&BufferDescriptor {
-            label: Some(Borrowed("ImGui Vertex Buffer")),
+            label: Some("ImGui Vertex Buffer"),
             size: num_vertices * size_of::<DrawVert>() as u64,
             usage: BufferUsage::VERTEX | BufferUsage::COPY_DST,
             mapped_at_creation: false,
@@ -325,7 +329,7 @@ impl Renderer {
 
     fn create_index_buffer(device: &Device, num_indices: u64) -> Buffer {
         device.create_buffer(&BufferDescriptor {
-            label: Some(Borrowed("ImGui Index Buffer")),
+            label: Some("ImGui Index Buffer"),
             size: num_indices * size_of::<DrawIdx>() as u64,
             usage: BufferUsage::INDEX | BufferUsage::COPY_DST,
             mapped_at_creation: false,
@@ -370,7 +374,7 @@ impl Renderer {
 
         // Start a new renderpass and prepare it properly.
         let mut rpass = encoder.begin_render_pass(&RenderPassDescriptor {
-            color_attachments: Borrowed(&[RenderPassColorAttachmentDescriptor {
+            color_attachments: &[RenderPassColorAttachmentDescriptor {
                 attachment: &view,
                 resolve_target: None,
                 ops: Operations {
@@ -380,7 +384,7 @@ impl Renderer {
                     },
                     store: true,
                 },
-            }]),
+            }],
             depth_stencil_attachment: None,
         });
         rpass.push_debug_group("ImGui");
