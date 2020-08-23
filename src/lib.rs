@@ -234,6 +234,7 @@ impl Renderer {
         // Create the render pipeline.
         let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
             layout: Some(&pipeline_layout),
+            label: Some("ImGui Render Pipeline"),
             vertex_stage: ProgrammableStageDescriptor {
                 module: &vs_module,
                 entry_point: "main",

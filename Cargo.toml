@@ -19,7 +19,7 @@ default = []
 glsl-to-spirv = {version = "0.1", optional = true}
 imgui = "0.4"
 log = "0.4"
-wgpu = {git = "https://github.com/gfx-rs/wgpu-rs.git", rev = "471d2a1a48c795a13d3c65a29ff184d7cfe9e766"}
+wgpu = "0.6"
 
 [dev-dependencies]
 env_logger = "0.5"
