@@ -246,6 +246,7 @@ impl Renderer {
             rasterization_state: Some(RasterizationStateDescriptor {
                 front_face: FrontFace::Cw,
                 cull_mode: CullMode::None,
+                polygon_mode: wgpu::PolygonMode::Fill,
                 clamp_depth: false,
                 depth_bias: 0,
                 depth_bias_slope_scale: 0.0,
