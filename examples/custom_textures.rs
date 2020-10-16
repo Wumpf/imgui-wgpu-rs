@@ -104,7 +104,7 @@ fn main() {
     // Set up Lenna texture
     let lenna_bytes = include_bytes!("../resources/Lenna.jpg");
     let image =
-        image::load_from_memory_with_format(lenna_bytes, ImageFormat::JPEG).expect("inavlid image");
+        image::load_from_memory_with_format(lenna_bytes, ImageFormat::Jpeg).expect("inavlid image");
     let image = image.to_rgba();
     let (width, height) = image.dimensions();
     let raw_data = image.into_raw();
@@ -165,7 +165,8 @@ fn main() {
                 window.request_redraw();
             }
             Event::RedrawEventsCleared => {
-                last_frame = imgui.io_mut().update_delta_time(last_frame);
+                imgui.io_mut().update_delta_time(last_frame.elapsed());
+                last_frame = Instant::now();
 
                 let frame = match swap_chain.get_current_frame() {
                     Ok(frame) => frame,
