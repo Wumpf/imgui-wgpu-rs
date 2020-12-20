@@ -163,10 +163,16 @@ impl Renderer {
         fs_raw: Vec<u32>,
     ) -> Renderer {
         // Load shaders.
-        let vs_module =
-            device.create_shader_module(wgpu::ShaderModuleSource::SpirV(Borrowed(&vs_raw)));
-        let fs_module =
-            device.create_shader_module(wgpu::ShaderModuleSource::SpirV(Borrowed(&fs_raw)));
+        let vs_module = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+            label: Some("imgui vertex shader"),
+            source: wgpu::ShaderSource::SpirV(Borrowed(&vs_raw)),
+            flags: wgpu::ShaderFlags::VALIDATION,
+        });
+        let fs_module = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+            label: Some("imgui fragment shader"),
+            source: wgpu::ShaderSource::SpirV(Borrowed(&fs_raw)),
+            flags: wgpu::ShaderFlags::VALIDATION,
+        });
 
         // Create the uniform matrix buffer.
         let uniform_buffer_size = 64;
@@ -183,9 +189,10 @@ impl Renderer {
             entries: &[BindGroupLayoutEntry {
                 binding: 0,
                 visibility: wgpu::ShaderStage::VERTEX,
-                ty: BindingType::UniformBuffer {
-                    dynamic: false,
-                    min_binding_size: wgpu::BufferSize::new(uniform_buffer_size),
+                ty: BindingType::Buffer {
+                    ty: BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: BufferSize::new(uniform_buffer_size),
                 },
                 count: None,
             }],
@@ -208,17 +215,20 @@ impl Renderer {
                 BindGroupLayoutEntry {
                     binding: 0,
                     visibility: wgpu::ShaderStage::FRAGMENT,
-                    ty: BindingType::SampledTexture {
+                    ty: BindingType::Texture {
+                        sample_type: Default::default(),
+                        view_dimension: TextureViewDimension::D2,
                         multisampled: false,
-                        component_type: TextureComponentType::Float,
-                        dimension: TextureViewDimension::D2,
                     },
                     count: None,
                 },
                 BindGroupLayoutEntry {
                     binding: 1,
                     visibility: wgpu::ShaderStage::FRAGMENT,
-                    ty: BindingType::Sampler { comparison: false },
+                    ty: BindingType::Sampler {
+                        filtering: true,
+                        comparison: false,
+                    },
                     count: None,
                 },
             ],
@@ -269,7 +279,7 @@ impl Renderer {
             }],
             depth_stencil_state: None,
             vertex_state: VertexStateDescriptor {
-                index_format: IndexFormat::Uint16,
+                index_format: Some(IndexFormat::Uint16),
                 vertex_buffers: &[VertexBufferDescriptor {
                     stride: size_of::<DrawVert>() as BufferAddress,
                     step_mode: InputStepMode::Vertex,
@@ -375,83 +385,87 @@ impl Renderer {
         self.update_uniform_buffer(queue, &matrix);
 
         // Start a new renderpass and prepare it properly.
-        let mut rpass = encoder.begin_render_pass(&RenderPassDescriptor {
-            color_attachments: &[RenderPassColorAttachmentDescriptor {
-                attachment: &view,
-                resolve_target: None,
-                ops: Operations {
-                    load: match self.clear_color {
-                        Some(color) => LoadOp::Clear(color),
-                        _ => LoadOp::Load,
+        encoder.push_debug_group("ImGui");
+        {
+            let mut rpass = encoder.begin_render_pass(&RenderPassDescriptor {
+                label: Some("ImGui"),
+                color_attachments: &[RenderPassColorAttachmentDescriptor {
+                    attachment: &view,
+                    resolve_target: None,
+                    ops: Operations {
+                        load: match self.clear_color {
+                            Some(color) => LoadOp::Clear(color),
+                            _ => LoadOp::Load,
+                        },
+                        store: true,
                     },
-                    store: true,
-                },
-            }],
-            depth_stencil_attachment: None,
-        });
-        rpass.push_debug_group("ImGui");
-        rpass.set_pipeline(&self.pipeline);
-        rpass.set_bind_group(0, &self.uniform_bind_group, &[]);
+                }],
+                depth_stencil_attachment: None,
+            });
+            rpass.set_pipeline(&self.pipeline);
+            rpass.set_bind_group(0, &self.uniform_bind_group, &[]);
 
-        // Resize vertex & index buffer if necessary.
-        {
-            let required_vertex_buffer_size = draw_data
-                .draw_lists()
-                .map(|draw_list| draw_list.vtx_buffer().len())
-                .sum::<usize>() as u64;
-            if required_vertex_buffer_size > self.vertex_buffer_capacity {
-                self.vertex_buffer_capacity = required_vertex_buffer_size;
-                self.vertex_buffer =
-                    Self::create_vertex_buffer(device, self.vertex_buffer_capacity);
+            // Resize vertex & index buffer if necessary.
+            {
+                let required_vertex_buffer_size = draw_data
+                    .draw_lists()
+                    .map(|draw_list| draw_list.vtx_buffer().len())
+                    .sum::<usize>() as u64;
+                if required_vertex_buffer_size > self.vertex_buffer_capacity {
+                    self.vertex_buffer_capacity = required_vertex_buffer_size;
+                    self.vertex_buffer =
+                        Self::create_vertex_buffer(device, self.vertex_buffer_capacity);
+                }
+            }
+            {
+                let required_index_buffer_size = draw_data
+                    .draw_lists()
+                    .map(|draw_list| (draw_list.idx_buffer().len() + 3) / 4 * 4)
+                    .sum::<usize>() as u64;
+                if required_index_buffer_size > self.index_buffer_capacity {
+                    self.index_buffer_capacity = required_index_buffer_size;
+                    self.index_buffer =
+                        Self::create_index_buffer(device, self.index_buffer_capacity);
+                }
+            }
+
+            // Transfer data and execute all the imgui render work.
+            let mut vertex_offset = 0;
+            let mut index_offset = 0;
+            for draw_list in draw_data.draw_lists() {
+                queue.write_buffer(
+                    &self.vertex_buffer,
+                    vertex_offset * size_of::<DrawVert>() as BufferAddress,
+                    as_byte_slice(draw_list.vtx_buffer()),
+                );
+
+                // Hack to ensure that index buffer data length is a multiple of four (webgpu requirement).
+                // We "know" this won't crash since arrays are 4 byte aligned
+                let index_data = unsafe {
+                    let index_data = as_byte_slice(draw_list.idx_buffer());
+                    std::slice::from_raw_parts(index_data.as_ptr(), (index_data.len() + 3) / 4 * 4)
+                };
+
+                queue.write_buffer(
+                    &self.index_buffer,
+                    index_offset * size_of::<DrawIdx>() as BufferAddress,
+                    index_data,
+                );
+
+                self.render_draw_list(
+                    &mut rpass,
+                    &draw_list,
+                    draw_data.display_pos,
+                    draw_data.framebuffer_scale,
+                    vertex_offset,
+                    index_offset,
+                )?;
+
+                vertex_offset += draw_list.vtx_buffer().len() as u64;
+                index_offset += (draw_list.idx_buffer().len() as u64 + 3) / 4 * 4;
             }
         }
-        {
-            let required_index_buffer_size = draw_data
-                .draw_lists()
-                .map(|draw_list| (draw_list.idx_buffer().len() + 3) / 4 * 4)
-                .sum::<usize>() as u64;
-            if required_index_buffer_size > self.index_buffer_capacity {
-                self.index_buffer_capacity = required_index_buffer_size;
-                self.index_buffer = Self::create_index_buffer(device, self.index_buffer_capacity);
-            }
-        }
-
-        // Transfer data and execute all the imgui render work.
-        let mut vertex_offset = 0;
-        let mut index_offset = 0;
-        for draw_list in draw_data.draw_lists() {
-            queue.write_buffer(
-                &self.vertex_buffer,
-                vertex_offset * size_of::<DrawVert>() as BufferAddress,
-                as_byte_slice(draw_list.vtx_buffer()),
-            );
-
-            // Hack to ensure that index buffer data length is a multiple of four (webgpu requirement).
-            // We "know" this won't crash since arrays are 4 byte aligned
-            let index_data = unsafe {
-                let index_data = as_byte_slice(draw_list.idx_buffer());
-                std::slice::from_raw_parts(index_data.as_ptr(), (index_data.len() + 3) / 4 * 4)
-            };
-
-            queue.write_buffer(
-                &self.index_buffer,
-                index_offset * size_of::<DrawIdx>() as BufferAddress,
-                index_data,
-            );
-
-            self.render_draw_list(
-                &mut rpass,
-                &draw_list,
-                draw_data.display_pos,
-                draw_data.framebuffer_scale,
-                vertex_offset,
-                index_offset,
-            )?;
-
-            vertex_offset += draw_list.vtx_buffer().len() as u64;
-            index_offset += (draw_list.idx_buffer().len() as u64 + 3) / 4 * 4;
-        }
-        rpass.pop_debug_group();
+        encoder.pop_debug_group();
 
         Ok(())
     }
@@ -469,11 +483,14 @@ impl Renderer {
         let mut start = 0;
         rpass.push_debug_group("draw list");
 
-        rpass.set_index_buffer(self.index_buffer.slice(
-            (index_offset * size_of::<DrawIdx>() as u64)
-                ..((index_offset + draw_list.idx_buffer().len() as u64)
-                    * size_of::<DrawIdx>() as u64),
-        ));
+        rpass.set_index_buffer(
+            self.index_buffer.slice(
+                (index_offset * size_of::<DrawIdx>() as u64)
+                    ..((index_offset + draw_list.idx_buffer().len() as u64)
+                        * size_of::<DrawIdx>() as u64),
+            ),
+            IndexFormat::Uint16,
+        );
         rpass.set_vertex_buffer(
             0,
             self.vertex_buffer.slice(

@@ -41,9 +41,9 @@ fn main() {
 
     let (mut device, mut queue) = block_on(adapter.request_device(
         &wgpu::DeviceDescriptor {
+            label: None,
             features: wgpu::Features::empty(),
             limits: wgpu::Limits::default(),
-            shader_validation: true,
         },
         None,
     ))
@@ -51,7 +51,7 @@ fn main() {
 
     // Set up swap chain
     let mut sc_desc = wgpu::SwapChainDescriptor {
-        usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+        usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
         format: wgpu::TextureFormat::Bgra8Unorm,
         width: size.width as u32,
         height: size.height as u32,
@@ -134,9 +134,8 @@ fn main() {
                 ..
             } => {
                 size = window.inner_size();
-
                 sc_desc = wgpu::SwapChainDescriptor {
-                    usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+                    usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
                     format: wgpu::TextureFormat::Bgra8Unorm,
                     width: size.width as u32,
                     height: size.height as u32,

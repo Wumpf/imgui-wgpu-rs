@@ -17,21 +17,21 @@ default = []
 
 [dependencies]
 glsl-to-spirv = {version = "0.1", optional = true}
-imgui = "0.5.0"
+imgui = "0.6.1"
 log = "0.4"
-wgpu = {git = "https://github.com/gfx-rs/wgpu-rs.git", rev = "e3eadca"}
+wgpu = {git = "https://github.com/gfx-rs/wgpu-rs.git", rev = "ee0b96cc2e4626f6bd1f3075e8429f411b18c91b"}
 
 [dev-dependencies]
 env_logger = "0.8.1"
 futures = "0.3"
 image = "0.23.10"
 raw-window-handle = "0.3"
-winit = "0.22.0"
+winit = "0.24.0"
 
 [dev-dependencies.imgui-winit-support]
 default-features = false
-features = ["winit-22"]
-version = "0.5.0"
+features = ["winit-23"]
+version = "0.6.1"
 
 [package.metadata.docs.rs]
 all-features = true
