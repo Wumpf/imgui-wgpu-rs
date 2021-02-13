@@ -17,7 +17,7 @@ default = []
 
 [dependencies]
 glsl-to-spirv = {version = "0.1", optional = true}
-imgui = "0.6.1"
+imgui = "0.7.0"
 log = "0.4"
 wgpu = {git = "https://github.com/gfx-rs/wgpu-rs.git", rev = "f891e86e87f0733f04a8078f4be8ead2f24551cf"}
 
@@ -30,8 +30,8 @@ winit = "0.24.0"
 
 [dev-dependencies.imgui-winit-support]
 default-features = false
-features = ["winit-23"]
-version = "0.6.1"
+features = ["winit-24"]
+version = "0.7.0"
 
 [package.metadata.docs.rs]
 all-features = true
